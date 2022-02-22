@@ -1,0 +1,203 @@
+#include <Adafruit_SSD1306.h>
+#include <Adafruit_GFX.h>
+
+
+//Sets the size of the display
+//If I run out of storage, I will decrease the size to 32 pixels height
+Adafruit_SSD1306 display(128, 64);
+
+
+//Setting global constants so that the values can be referenced within multiple functions.
+//This works better than returning values because a function can only return 1 value
+//Delta Waves
+int power_D = 0;                                //Power Value for delta Wave
+int rect_D = 0;                                 //Pixel Value that corresponds to the power value for Delta Wave
+
+//Theta Waves
+int power_T = 0;                                //Power Value for theta Wave
+int rect_T = 0;                                 //Pixel Value that corresponds to the power value for Theta Wave
+
+//Alpha Waves
+int power_A = 0;                                //Power Value for alpha Wave
+int rect_A = 0;                                 //Pixel Value that corresponds to the power value for Alpha Wave
+
+//Beta Waves
+int power_B = 0;                                //Power Value for beta Wave
+int rect_B = 0;                                 //Pixel Value that corresponds to the power value for Beta Wave
+
+int voltage = A0;                               //Analog voltage reading at A0
+int number = 0;                                 //Makes sure that the program is sampling 128 times per second
+
+float maxVoltage = 0;                           //Initialize max and min voltages as global variables
+float minVoltage = 0;
+
+
+
+
+
+void setup() {
+  Serial.begin(9600);                           //communication with computer begins.
+  display.begin(SSD1306_SWITCHCAPVCC, 0x3C);    //device address is 0x3C from specifications
+  set_Graph();                                  //Sets the axis lines and background materials
+
+}
+
+
+
+
+
+void loop() {
+  analog_Loop();                                //takes the analog value from the circuit and determines the values for max and min voltage
+  loop_Call();                                  //displays the bar graph onto the circuit
+}
+
+
+
+
+
+/*
+  The purpose for this function is to create the bar graph's parts that only need to be set once
+  (i.e. not covered by other parts or needs to be changed)
+*/
+
+void set_Graph() {
+  //Intializing Text Display
+  display.clearDisplay();                       //Clears previous uploads
+  display.setTextSize(1);                       //Sets the text to size 1
+  display.setTextColor(SSD1306_WHITE);          //Sets the text's color to White
+  
+  //Setting P for Power for y-axis
+  display.setCursor(0,0);
+  display.print("P");
+  
+  //Setting The labels for the waves
+  display.setCursor(32,57);
+  display.print("D   T   A   B");
+  
+  //Power rating levels (Scaled so that the center of the character is with the dash across the y-axis
+  display.setCursor(0,11);
+  display.print("20");
+  display.setCursor(0,21);
+  display.print("15");
+  display.setCursor(0,31);
+  display.print("10");
+  display.setCursor(0,41);
+  display.print("5");
+  
+  //Axis Lines
+  display.drawLine(20,10,20,64, WHITE);
+  display.drawLine(0,54,128,54, WHITE);
+  
+  display.display();
+  }
+
+
+
+
+
+/*
+  The purpose for this function is to create the bar graph's parts that are dependent on the value of the power
+  of the brain's signal
+*/
+
+void loop_Call(){
+
+  //Delta Waves
+  int rect_D = (40 - (2 * power_D));            //Determines what pixel the rectangle should stop at to show the power level for delta waves 
+
+  //Theta Waves
+  int rect_T = (40 - (2 * power_T));            //Determines what pixel the rectangle should stop at to show the power level for theta waves
+  
+  //Alpha Waves
+  int rect_A = (40 - (2 * power_A));            //Determines what pixel the rectangle should stop at to show the power level for alpha waves
+  
+  //Beta Waves
+  int rect_B = (40 - (2 * power_B));            //Determines what pixel the rectangle should stop at to show the power level for beta waves
+
+
+  //To build the bar graph, we have to use the fillRect function which can only build downwards.
+  //So to make this work, we made the entire column white and then shaded it black up to the point
+  //where the power value will be
+  
+  //Delta Waves
+  display.fillRect(32,14,5,40,WHITE);           //creates a white rectangle that will mark the point where 
+  display.fillRect(32,14,5,rect_D,BLACK);       //creates a black rectangle that will shade in the white rectangle above the power value
+  
+  //Theta Waves
+  display.fillRect(56,14,5,40,WHITE);           //creates a white rectangle that will mark the point where
+  display.fillRect(56,14,5,rect_T,BLACK);       //creates a black rectangle that will shade in the white rectangle above the power value
+  
+  //Alpha Waves
+  display.fillRect(80,14,5,40,WHITE);           //creates a white rectangle that will mark the point where
+  display.fillRect(80,14,5,rect_A,BLACK);       //creates a black rectangle that will shade in the white rectangle above the power value
+  
+  //Beta Waves
+  display.fillRect(104,14,5,40,WHITE);          //creates a white rectangle that will mark the point where
+  display.fillRect(104,14,5,rect_B,BLACK);      //creates a black rectangle that will shade in the white rectangle above the power value
+  
+  //Axis lines go over bar graphs, if added once, the bar graphs will impose themselves over the lines.
+  display.drawLine(16,14,128,14, WHITE);
+  display.drawLine(16,24,128,24, WHITE);
+  display.drawLine(16,34,128,34, WHITE);
+  display.drawLine(16,44,128,44, WHITE);
+
+  display.display();                            //Displays it to the board
+  
+}
+
+
+
+
+
+/*
+  The purpose of this function is to take in the analog values from the amplifier
+  and find the maximum and minmum value of the voltage. This will also be where
+  we implement the fast fourier transform to find what the power will be for each
+  type of brain wave. In the meantime, I have set the power values to constant to test
+  the output to the OLED.
+*/
+
+void analog_Loop(){
+  
+  int max = 0;                                  // Establishes max and min values as the bounds of AD conversion so that max and min values can be determined 
+  int min = 1023;
+  int SampleRate = 128;                         // Establishes the number of samples being taken
+  number = 0;
+  for (int i = 0; i < SampleRate; i++){         // Initializes for loop
+    int val = analogRead(voltage);              // Reads the voltage signal in to analog input port A0
+    if (val > max){                             // Checks if voltage is greater than 0, if it is the variable max is declared to be the voltage reading
+    max = val;            
+  }
+  if (val < min){                               // Checks if voltage is less than 1023, if it is the variable min is declared to be the voltage reading
+    min = val; 
+  } 
+  delay(7.8125);                                // Time delay so that the 128 samples will be taken in 1 second
+  number++;                                     // Makes sure that the counter samples 128 times a second
+  }
+  maxVoltage = max * (5.0 / 1023.0);            //Declares a new variable where the analog reading of max is converted back into a voltage
+  minVoltage = min * (5.0 / 1023.0);            //Declares a new variable where the analog reading of min is converted back into a voltage
+  Serial.println(number);                       //Displays the count
+  
+  String xVoltage = String(maxVoltage);         //Turns the value of Max voltage into a string so it can be printed to board
+  String nVoltage = String(minVoltage);         //Turns the value of Min voltage into a string so it can be printed to board
+
+
+  display.fillRect(14,0,114,12,BLACK);          //Creates a black rectangle to cover the previous max and min output layer
+  display.setCursor(14,0);
+  display.print("Max:" + xVoltage + "V Min:" + nVoltage + "V");       //Writes the strings previously created for max/min voltage to the board above the graph
+  display.display();                            //Display the voltages
+
+  //Setting constants because we have yet to learn how to implement a Fast Fourier Transform
+  //Delta Waves
+  power_D = 18;
+  
+  //Theta Waves
+  power_T = 12;
+  
+  //Alpha Waves
+  power_A = 9;
+  
+  //Beta Waves
+  power_B = 2;
+  
+}
